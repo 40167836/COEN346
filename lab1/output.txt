@@ -1,0 +1,46 @@
+Thread 1 started
+Thread 10 started
+Thread 11 started
+Thread 100 started
+Thread 101 started
+Thread 111 started
+Thread 110 started
+Thread 101 finished: 
+Thread 100 finished: 
+Sorted sublist [0 to 1]: 
+3304 
+8221 
+Thread 111 finished: 
+Sorted sublist [6 to 7]: 
+7856 
+21362 
+Thread 110 finished: 
+Sorted sublist [4 to 5]: 
+1509 
+6367 
+Sorted sublist [2 to 3]: 
+14038 
+26849 
+Thread 11 finished: 
+Sorted sublist [4 to 7]: 
+1509 
+6367 
+7856 
+21362 
+Thread 10 finished: 
+Sorted sublist [0 to 3]: 
+3304 
+8221 
+14038 
+26849 
+Thread 1 finished: 
+Sorted sublist [0 to 7]: 
+1509 
+3304 
+6367 
+7856 
+8221 
+14038 
+21362 
+26849 
+Final sorted array: 1509 3304 6367 7856 8221 14038 21362 26849 
