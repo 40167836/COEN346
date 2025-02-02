@@ -1,0 +1,54 @@
+import threading
+
+#merge function to combine 2 sorted list
+def merge(left,right):
+    sorted = []
+    i=j=0
+    while i < len(left) and j < len(right):
+        if left[i]<=right[j]:
+            sorted.append(left[i])
+            i+=1
+        else:
+            sorted.append(right[i])
+            j+=1
+    #include the surplus of lists
+    sorted.extend(left[i:])
+    sorted.extend(right[j:])
+    return sorted
+
+def sort(arr, name ='1' ):
+    print('Thread' + name + 'started')
+    if len(arr)< 1:
+        return arr
+
+    mid = len(arr)//2
+    left = arr[:mid]
+    right = arr[mid:]
+
+    # Creating two threads for sorting left and right halves
+    left_thread = threading.Thread(target=sort, args=(left, name+ '1'))
+    right_thread = threading.Thread(target=sort, args=(right, name + '0'))
+
+    # Start the threads
+    left_thread.start()
+    right_thread.start()
+
+    # Wait for threads to complete
+    left_thread.join()
+    right_thread.join()
+
+    print('Thread' + name + 'finished: ')
+    # Merge the results
+    return merge(left, right)
+
+
+# Driver function to call the merge_sort
+def merge_sort_multithreaded(arr):
+    return sort(arr)
+
+if __name__ == "__main__":
+    test = [3304,8221, 26849, 14038, 1509, 6367, 7856, 21362]
+    sorted_array = merge_sort_multithreaded(test)
+    print(sorted_array)
+
+
