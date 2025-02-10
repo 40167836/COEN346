@@ -1,34 +1,59 @@
 import threading
+import time
+
+lock = threading.Lock()  # Global mutex, used to allow only one thread to print at a time
 
 #merge function to combine 2 sorted list
 def merge(left,right):
-    sorted = []
+    sorted_ = []
     i=j=0
+
     while i < len(left) and j < len(right):
         if left[i]<=right[j]:
-            sorted.append(left[i])
+            sorted_.append(left[i])
             i+=1
         else:
-            sorted.append(right[i])
+            sorted_.append(right[j])
             j+=1
-    #include the surplus of lists
-    sorted.extend(left[i:])
-    sorted.extend(right[j:])
-    return sorted
+    #include the surplus
+    sorted_.extend(left[i:])
+    sorted_.extend(right[j:])
+    return sorted_
 
 def sort(arr, name ='1' ):
-    print('\nThread' + name + 'started')
-    if len(arr)< 2:#we want to stop when it reaches a lenght on 1
-        print('\nThread' + name + 'finished: ')
-        return print(arr)
+    time.sleep(0.1)#This is simply to ensure that 3digit thread(100) run/prints before 4digit thread(1000).
+                   #Without it, you would get the same final array but not the same
+                   #thread flow which is required for this assignment. Would not use in a real setting.
+    with lock:
+        f = open("output.txt", "a")
+        f.write('Thread ' + name + ' started' + '\n')
+        f.close()
+
+    if len(arr)< 2:#base case
+        with lock:
+            f = open("output.txt", "a")
+            f.write('Thread' + name + 'finished: ' + str(arr) + '\n')
+            f.close()
+        return arr
 
     mid = len(arr)//2
-    left = arr[:mid]
-    right = arr[mid:]
+    down = arr[:mid]
+    up = arr[mid:]
+
+    #store the left and right sorted array created before they are merged
+    left_result = []
+    right_result = []
+
+    def left_sort():
+        nonlocal left_result
+        left_result = sort(down, name + '0')#adds 0 to the thread name when it divides it to the left
+    def right_sort():
+        nonlocal right_result
+        right_result = sort(up, name + '1')#adds 1 to the thread name when it divides it to the right
 
     # Creating two threads for sorting left and right halves
-    left_thread = threading.Thread(target=sort, args=(left, name+ '0'))#adds 0 to the thread name when it divides it to the left
-    right_thread = threading.Thread(target=sort, args=(right, name + '1'))#adds 1 to the thread name when it divides it to the right
+    left_thread = threading.Thread(target =  left_sort)#use different functions to be able to merge the
+    right_thread = threading.Thread(target= right_sort)#different result at the end without unexpected overlap
 
     # Start the threads
     left_thread.start()
@@ -38,21 +63,21 @@ def sort(arr, name ='1' ):
     left_thread.join()
     right_thread.join()
 
-
-    print('\nThread' + name + 'finished: ')
+    result = merge(left_result, right_result)
+    with lock:
+        f = open("output.txt", "a")
+        f.write('Thread' + name + 'finished: ' + str(result) + '\n')
     # Merge the results
-    return print(merge(left, right))
+    return result
 
 
 if __name__ == "__main__":
-    #test = []
-    #fileOB = open('input.txt', "r")
-   # lines = fileOB.read().splitlines()
-   # for line in lines:
-    #    test.extend(line.split())
-    test = [3304, 8221, 26849, 14038, 1509, 6367, 7856, 21362]
-    sorted_array = sort(test)
-    print(sorted_array)
+    # test = [3304, 8221, 26849, 14038, 1509, 6367, 7856, 21362]
+    # sorted_array = sort(test)
+    open("output.txt", "w").close()
+    with open("input.txt", "r") as file:
+        test = [int(line.strip()) for line in file]  # Read input
 
+    sorted_array = sort(test)
 
  
