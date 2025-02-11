@@ -66,7 +66,7 @@ def sort(arr, name ='1' ):
     result = merge(left_result, right_result)
     with lock:
         f = open("output.txt", "a")
-        f.write('Thread' + name + 'finished: ' + str(result) + '\n')
+        f.write('Thread ' + name + ' finished: ' + str(result) + '\n')
     # Merge the results
     return result
 
