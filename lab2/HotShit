@@ -7,7 +7,6 @@ time_lock = threading.Lock()  # Ensures time continuity
 
 time_counter = 1  # Start global time at 1s
 
-# FUNCTION TO READ INPUT
 def read_input_file(filename="input.txt"):
     """ Reads input and structures it into a list of dictionaries with process IDs. """
     with open(filename, 'r') as file:
@@ -15,20 +14,24 @@ def read_input_file(filename="input.txt"):
 
     quantum = int(lines[0][0])  # Extract the quantum time (first line)
     processes = []  # List of processes with explicit IDs
-    
-    process_id = 0  # Assign explicit process IDs
+    user_process_counts = {}  # Track process IDs per user
 
     i = 1  # Start processing from the second line (index 1)
     while i < len(lines):
         if len(lines[i]) == 2:  # Detect user line (username + num of processes)
             username, num_processes = lines[i][0], int(lines[i][1])
-            
 
+            if username not in user_process_counts:
+                user_process_counts[username] = 0  # Initialize PID counter for new user
+            
             for _ in range(num_processes):
                 i += 1  # Move to next line
                 ready_time, burst_time = map(int, lines[i])
+                
+                process_id = user_process_counts[username]  # Assign process ID per user
                 processes.append([username, ready_time, burst_time, process_id])  # Include process ID
-                process_id += 1  # Increment process ID
+                
+                user_process_counts[username] += 1  # Increment per-user process ID
 
         i += 1  # Move to next user
 
