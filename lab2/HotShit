@@ -15,14 +15,14 @@ def read_input_file(filename="input.txt"):
 
     quantum = int(lines[0][0])  # Extract the quantum time (first line)
     processes = []  # List of processes with explicit IDs
-    unique_users = set()
+    
     process_id = 0  # Assign explicit process IDs
 
     i = 1  # Start processing from the second line (index 1)
     while i < len(lines):
         if len(lines[i]) == 2:  # Detect user line (username + num of processes)
             username, num_processes = lines[i][0], int(lines[i][1])
-            unique_users.add(username)
+            
 
             for _ in range(num_processes):
                 i += 1  # Move to next line
@@ -32,8 +32,7 @@ def read_input_file(filename="input.txt"):
 
         i += 1  # Move to next user
 
-    num_active_users = len(unique_users)
-    return num_active_users, quantum, processes
+    return quantum, processes
 
 ###### FUNCTION TO SIMULATE PROCESS EXECUTION ######
 def run_process(user, process_id, execution_time, process):
@@ -59,7 +58,7 @@ def run_process(user, process_id, execution_time, process):
                 print(f"Time {time_counter}s, User {user}, Process {process_id}, Paused, Remaining Burst: {process[2]}")
 
 # FUNCTION FOR FAIR-SHARE ROUND ROBIN SCHEDULING #
-def fair_share_scheduler(num_active_users, quantum, processes):
+def fair_share_scheduler( quantum, processes):
     """ Implements Fair-Share Round Robin Scheduling with strict quantum enforcement. """
     global time_counter
 
@@ -121,8 +120,7 @@ def process_select(user, processes, user_share, time_counter):
 
 if __name__ == "__main__":
     # Read and organize input from the file
-    num_active_users, quantum, processes = read_input_file()
+    quantum, processes = read_input_file()
 
     # Run Fair-Share Round Robin Scheduler
-    fair_share_scheduler(num_active_users, quantum, processes)
-
+    fair_share_scheduler(quantum, processes)
