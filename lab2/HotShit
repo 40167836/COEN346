@@ -9,13 +9,14 @@ time_counter = 1  # Start global time at 1s
 
 # FUNCTION TO READ INPUT
 def read_input_file(filename="input.txt"):
-    """ Reads input and structures it into a flattened list of lists. """
+    """ Reads input and structures it into a list of dictionaries with process IDs. """
     with open(filename, 'r') as file:
         lines = [line.strip().split() for line in file.readlines()]
 
     quantum = int(lines[0][0])  # Extract the quantum time (first line)
-    processes = []  # Flattened list like [['A', 1, 5], ['A', 4, 3], ['B', 5, 6]]
-    unique_users = set()  # Track unique users
+    processes = []  # List of processes with explicit IDs
+    unique_users = set()
+    process_id = 0  # Assign explicit process IDs
 
     i = 1  # Start processing from the second line (index 1)
     while i < len(lines):
@@ -23,16 +24,16 @@ def read_input_file(filename="input.txt"):
             username, num_processes = lines[i][0], int(lines[i][1])
             unique_users.add(username)
 
-            # Read and store next `num_processes` lines directly
             for _ in range(num_processes):
                 i += 1  # Move to next line
-                ready_time, burst_time = map(int, lines[i])  # Convert arrival/burst times
-                processes.append([username, ready_time, burst_time])  # (User, Ready, Burst)
+                ready_time, burst_time = map(int, lines[i])
+                processes.append([username, ready_time, burst_time, process_id])  # Include process ID
+                process_id += 1  # Increment process ID
 
         i += 1  # Move to next user
 
-    num_active_users = len(unique_users)  # Count unique users
-    return num_active_users, quantum, processes  # Return active user count, quantum, process list
+    num_active_users = len(unique_users)
+    return num_active_users, quantum, processes
 
 ###### FUNCTION TO SIMULATE PROCESS EXECUTION ######
 def run_process(user, process_id, execution_time, process):
@@ -46,7 +47,6 @@ def run_process(user, process_id, execution_time, process):
 
             time.sleep(execution_time)  # Simulate execution delay
 
-        
             process[2] -= execution_time  # Reduce burst time
 
             with time_lock:
@@ -110,7 +110,7 @@ def process_select(user, processes, user_share, time_counter):
 
         execution_time = min(process[2], remaining_quantum)
 
-        process_thread = threading.Thread(target=run_process, args=(process[0], processes.index(process), execution_time, process))
+        process_thread = threading.Thread(target=run_process, args=(process[0], process[3], execution_time, process))
         process_thread.start()
         processThreads.append(process_thread)
 
