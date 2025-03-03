@@ -111,12 +111,9 @@ def process_select(user, processes, user_share, time_counter):
         execution_time = min(process[2], remaining_quantum)
 
         process_thread = threading.Thread(target=run_process, args=(process[0], process[3], execution_time, process))
-        process_thread.start()
         processThreads.append(process_thread)
+        process_thread.start()
 
-        remaining_quantum -= execution_time
-        if remaining_quantum <= 0:
-            break  # Stop scheduling when quantum expires
 
     # Wait for all threads of this user to complete
     for thread in processThreads:
@@ -128,3 +125,4 @@ if __name__ == "__main__":
 
     # Run Fair-Share Round Robin Scheduler
     fair_share_scheduler(num_active_users, quantum, processes)
+
