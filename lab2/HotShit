@@ -1,129 +1,118 @@
 import threading
-import time
 
-# Locks for synchronization
 process_lock = threading.Lock()
-time_lock = threading.Lock()  # Ensures time continuity
+time_lock = threading.Lock()  # manage time thread
 
 time_counter = 1  # Start global time at 1s
 
-def read_input_file(filename="input.txt"):
-    """ Reads input and structures it into a list of dictionaries with process IDs. """
+
+def read_input_file(filename="lab2\input.txt"):
     with open(filename, 'r') as file:
-        lines = [line.strip().split() for line in file.readlines()]
+        #reads line by line. Strip() removes any whitespace at the beginning and end, and split() makes a substring out of the string.
+        lines = [line.strip().split() for line in file.readlines()] 
 
-    quantum = int(lines[0][0])  # Extract the quantum time (first line)
-    processes = []  # List of processes with explicit IDs
-    user_process_counts = {}  # Track process IDs per user
+    quantum = int(lines[0][0])  # first line is the quantum
+    processes = []
+    user_process_counts = {}
 
-    i = 1  # Start processing from the second line (index 1)
+    i = 1
     while i < len(lines):
-        if len(lines[i]) == 2:  # Detect user line (username + num of processes)
+        if len(lines[i]) == 2:
             username, num_processes = lines[i][0], int(lines[i][1])
 
             if username not in user_process_counts:
-                user_process_counts[username] = 0  # Initialize PID counter for new user
+                user_process_counts[username] = 0 #this will be the process id
             
-            for _ in range(num_processes):
-                i += 1  # Move to next line
+            for _ in range(num_processes): #runs through n lines (which will be process lines) associated with n processes belonging to user
+                i += 1
                 ready_time, burst_time = map(int, lines[i])
                 
-                process_id = user_process_counts[username]  # Assign process ID per user
-                processes.append([username, ready_time, burst_time, process_id])  # Include process ID
+                process_id = user_process_counts[username] #process id assignment
+                processes.append([username, ready_time, burst_time, process_id])
                 
-                user_process_counts[username] += 1  # Increment per-user process ID
+                user_process_counts[username] += 1 #process id increment
 
-        i += 1  # Move to next user
+        i += 1  #we incremented I in the processes loop above. once that stops running we increment again to the next user.
 
     return quantum, processes
 
-###### FUNCTION TO SIMULATE PROCESS EXECUTION ######
-def run_process(user, process_id, execution_time, process):
-    """ Simulates the execution of a process, updating burst time. """
+def fair_share_scheduler(quantum, processes, file):
     global time_counter
-
-    if execution_time > 0:
-        with process_lock:
-            print(f"Time {time_counter}s, User {user}, Process {process_id}, Started, Remaining Burst: {process[2]}")
-            print(f"Time {time_counter}s, User {user}, Process {process_id}, Resumed, Remaining Burst: {process[2]}")
-
-            time.sleep(execution_time)  # Simulate execution delay
-
-            process[2] -= execution_time  # Reduce burst time
-
-            with time_lock:
-                time_counter += execution_time  # Ensure time is updated correctly
-
-            if process[2] <= 0:
-                process[2] = 0
-                print(f"Time {time_counter}s, User {user}, Process {process_id}, Finished, Remaining Burst: {process[2]}")
-            else:
-                print(f"Time {time_counter}s, User {user}, Process {process_id}, Paused, Remaining Burst: {process[2]}")
-
-# FUNCTION FOR FAIR-SHARE ROUND ROBIN SCHEDULING #
-def fair_share_scheduler( quantum, processes):
-    """ Implements Fair-Share Round Robin Scheduling with strict quantum enforcement. """
-    global time_counter
-
-    print("\n--- Starting Scheduler ---\n")
 
     while processes:
-        active_users = list(set(p[0] for p in processes))  # Get unique users
+        active_users = list(set(p[0] for p in processes if p[1] <= time_counter)) #all users with active processes
         num_active_users = len(active_users)
 
-        if num_active_users == 0:
-            break  # Stop if no active users are left
+        if num_active_users == 0: #stop if no users
+            break
 
-        user_share = quantum // num_active_users  # Divide quantum among users
-        executed_any = False  # Track if a process was executed
+        user_share = quantum // num_active_users
+        executed_any = False #manages process has-executed logic
 
-        userThreads = []  # Store active threads for users
+        userThreads = []
         for user in active_users:
-            # Each user will have their own thread for scheduling
-            user_thread = threading.Thread(target=process_select, args=(user, processes, user_share, time_counter))
+            #each user will have their own thread for scheduling
+            user_thread = threading.Thread(target=process_select, args=(user, processes, user_share, time_counter, file))
             userThreads.append(user_thread)
             user_thread.start()
 
         for user_thread in userThreads:
-            user_thread.join()  # Ensure all user threads are finished before continuing
+            user_thread.join()  #ensure all user threads are finished before continuing
 
-        # Remove completed processes
-        processes = [p for p in processes if p[2] > 0]
+        processes = [p for p in processes if p[2] > 0] #if a process has finished, take it out of the list
 
-    print("\n--- Scheduler Stopped ---")
 
-def process_select(user, processes, user_share, time_counter):
-    """ Function to select and run processes for a particular user """
-    processThreads = []  # Threads for processes of the current user
-
-    # Select processes for this user
+def process_select(user, processes, user_share, time_counter, file):
+    processThreads = []  #threads for processes of the current user
+    #process selection logic
     user_processes = [p for p in processes if p[0] == user and p[1] <= time_counter]
     num_user_processes = len(user_processes)
 
     if num_user_processes == 0:
-        return  # No processes ready for this user
+        return #no processes
 
-    process_share = user_share // num_user_processes  # Divide user’s share among processes
-    remaining_quantum = process_share  # Available quantum for this user
+    process_share = user_share // num_user_processes  #divide user’s share among processes
+    remaining_quantum = process_share
 
     for process in user_processes:
         if process[2] == 0:
-            continue  # Skip completed processes
+            continue
 
         execution_time = min(process[2], remaining_quantum)
 
-        process_thread = threading.Thread(target=run_process, args=(process[0], process[3], execution_time, process))
+        process_thread = threading.Thread(target=run_process, args=(process[0], process[3], execution_time, process, file))
         processThreads.append(process_thread)
         process_thread.start()
 
-
-    # Wait for all threads of this user to complete
     for thread in processThreads:
         thread.join()
 
-if __name__ == "__main__":
-    # Read and organize input from the file
-    quantum, processes = read_input_file()
+process_started = {}  #tracks started processes
 
-    # Run Fair-Share Round Robin Scheduler
-    fair_share_scheduler(quantum, processes)
+def run_process(user, process_id, execution_time, process, file):
+    global time_counter, process_started
+    if execution_time > 0:
+        with process_lock:
+            if (user, process_id) not in process_started:
+                file.write(f"Time {time_counter}, User {user}, Process {process_id}, Started\n")
+                process_started[(user, process_id)] = True  # Mark process as started
+            else:
+                file.write(f"Time {time_counter}, User {user}, Process {process_id}, Resumed\n")
+
+            process[2] -= execution_time #process[2] is the time remaining in the process
+
+            with time_lock: #update the global time counter using the lock
+                time_counter += execution_time
+            if process[2] <= 0:
+                process[2] = 0
+                file.write(f"Time {time_counter}, User {user}, Process {process_id}, Finished\n")
+            else:
+                file.write(f"Time {time_counter}, User {user}, Process {process_id}, Paused\n")
+
+
+if __name__ == "__main__":
+
+    quantum, processes = read_input_file()
+    with open("lab2\output.txt", 'w') as file:
+
+        fair_share_scheduler(quantum, processes, file)
