@@ -46,7 +46,41 @@ def read_input_file(filename="input.txt"):
 
     return quantum, processes
 
+def read_process_file(filename="processes.txt"):
+    with open(filename, 'r') as file:
+        #reads line by line. Strip() removes any whitespace at the beginning and end, and split() makes a substring out of the string.
+        lines = [line.strip().split() for line in file.readlines()] 
 
+    nb_cores = int(lines[0][0])  # first line is the number of Cores
+    nb_processes = int(lines[1][0])  # first line is the number of Cores
+    processes = []
+    i=2
+    name=0
+    while i < nb_processes:
+        
+        start_time, duration = int (lines[i][0]), int (lines[i][1])
+        name+=1
+        processes.append(name, start_time, duration)
+    
+    return nb_cores, nb_processes, processes
+
+def read_commands_file(filename="commands.txt"):
+    with open(filename, 'r') as file:
+        #reads line by line. Strip() removes any whitespace at the beginning and end, and split() makes a substring out of the string.
+        lines = [line.strip().split() for line in file.readlines()]
+        commands = []
+
+    for line in lines:
+        command_line = [int(value) if value.isdigit() else value for value in line]
+        commands.append(command_line)  # Appends a list with converted values
+
+    return commands
+
+def read_memconfig_file(filename="memconfig.txt"):
+    with open(filename, 'r') as file:
+        memory_space = file.read().strip()
+
+    return int(memory_space)
 
 def fair_share_scheduler(quantum, processes, file):
     global time_counter
