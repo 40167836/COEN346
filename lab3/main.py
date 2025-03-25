@@ -6,8 +6,10 @@ process_lock = threading.Lock()
 
 time_counter = 1  # Shared Variable Start global time at 1s
 time_running = True
-
-
+memory_used = 0
+main_memory = []
+disk_memory = []
+command_index = 0
 def timer():
     global time_counter 
     while time_running:
@@ -78,9 +80,25 @@ def read_commands_file(filename="commands.txt"):
 
 def read_memconfig_file(filename="memconfig.txt"):
     with open(filename, 'r') as file:
-        memory_space = file.read().strip()
+       memory_space = file.read().strip()
 
     return int(memory_space)
+
+def store(variable, value):
+    global time_counter, commands, command_index, memory_used, main_memory, disk_memory
+
+    if memory_used < memory_space: 
+        main_memory.append(variable)
+        main_memory.append(value) 
+        command_index += 2
+        memory_used += 1
+    else:
+        disk_memory.append(commands[command_index+1])
+        disk_memory.append(commands[command_index+2]) 
+        command_index += 2
+    time_counter += 1
+    time.sleep(1)
+    return 
 
 def fair_share_scheduler(quantum, processes, file):
     global time_counter
@@ -180,10 +198,8 @@ def run_process(user, process_id, execution_time, process, file):
                         return index, removed_tuple
         return None
 
-    def lookup(string variableId):
-
-
-    def read_disk_memory():
+      
+      def read_disk_memory():
         with open("vm.txt", 'r') as file:
             disk_memory_string = file.read().strip()
             return eval(disk_memory_string)
@@ -193,9 +209,15 @@ def run_process(user, process_id, execution_time, process, file):
         return virtual_memory
 
 
+
+
 if __name__ == "__main__":
     virtual_memory = []
+    commands = read_commands_file()
+    nb_cores, nb_processes, processes = read_process_file()
+    memory_space = read_memconfig_file()
     quantum, processes = read_input_file()
+
     with open("output.txt", 'w') as file:
 
         scheduler_thread = threading.Thread(target=fair_share_scheduler, args=(quantum,processes,file))
