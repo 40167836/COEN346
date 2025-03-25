@@ -18,7 +18,7 @@ def timer():
         print(f"Time: {time_counter}s")
         
 
-def read_input_file(filename="input.txt"):
+def read_input_file(filename="lab3\input.txt"):
     with open(filename, 'r') as file:
         #reads line by line. Strip() removes any whitespace at the beginning and end, and split() makes a substring out of the string.
         lines = [line.strip().split() for line in file.readlines()] 
@@ -183,13 +183,40 @@ def run_process(user, process_id, execution_time, process, file):
         with process_lock:
             file.write(f"Time {time_counter}, User {user}, Process {process_id}, Paused\n")
 
+    def release(variableId):
+        virtual_memory = read_main_memory()
+        disk_memory = read_disk_memory()
+        
+        for index, (id, ) in enumerate(virtual_memory):
+            if id == variableId:
+                removed_tuple = virtual_memory.pop(index)  # Remove the matching tuple
+                return index, removed_tuple
+            else:
+                for index, (id, ) in enumerate(disk_memory):
+                    if id == variableId:
+                        removed_tuple = disk_memory.pop(index)  # Remove the matching tuple
+                        return index, removed_tuple
+        return None
+
+      
+      def read_disk_memory():
+        with open("vm.txt", 'r') as file:
+            disk_memory_string = file.read().strip()
+            return eval(disk_memory_string)
+
+    def read_main_memory():
+        global virtual_memory
+        return virtual_memory
+
 
 
 
 if __name__ == "__main__":
+    virtual_memory = []
     commands = read_commands_file()
     nb_cores, nb_processes, processes = read_process_file()
     memory_space = read_memconfig_file()
+    quantum, processes = read_input_file()
 
     with open("output.txt", 'w') as file:
 
