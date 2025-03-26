@@ -2,7 +2,6 @@ import threading
 import time
 
 process_lock = threading.Lock()
-#time_lock = threading.Lock()  # manage time thread
 
 time_counter = 1  # Shared Variable Start global time at 1s
 time_running = True
@@ -10,61 +9,30 @@ memory_used = 0
 main_memory = []
 disk_memory = []
 command_index = 0
+running_processes = []
+
+
 def timer():
     global time_counter 
     while time_running:
         time.sleep(1)
         time_counter += 1
         print(f"Time: {time_counter}s")
-        
 
-def read_input_file(filename="lab3\input.txt"):
+def read_processes_file(filename="processes.txt"):
+    global max_cores
     with open(filename, 'r') as file:
-        #reads line by line. Strip() removes any whitespace at the beginning and end, and split() makes a substring out of the string.
-        lines = [line.strip().split() for line in file.readlines()] 
+        lines = [line.strip().split() for line in file.readlines()]
 
-    quantum = int(lines[0][0])  # first line is the quantum
+    max_cores = int(lines[0][0])
+    num_processes = int(lines[1][0])
+
     processes = []
-    user_process_counts = {}
+    for i in range(2, 2 + num_processes):
+        start_time, duration = map(int, lines[i])
+        processes.append({"id": i - 2, "start": start_time, "duration": duration})
 
-    i = 1
-    while i < len(lines):
-        if len(lines[i]) == 2:
-            username, num_processes = lines[i][0], int(lines[i][1])
-
-            if username not in user_process_counts:
-                user_process_counts[username] = 0 #this will be the process id
-            
-            for _ in range(num_processes): #runs through n lines (which will be process lines) associated with n processes belonging to user
-                i += 1
-                ready_time, burst_time = map(int, lines[i])
-                
-                process_id = user_process_counts[username] #process id assignment
-                processes.append([username, ready_time, burst_time, process_id])
-                
-                user_process_counts[username] += 1 #process id increment
-
-        i += 1  #we incremented I in the processes loop above. once that stops running we increment again to the next user.
-
-    return quantum, processes
-
-def read_process_file(filename="processes.txt"):
-    with open(filename, 'r') as file:
-        #reads line by line. Strip() removes any whitespace at the beginning and end, and split() makes a substring out of the string.
-        lines = [line.strip().split() for line in file.readlines()] 
-
-    nb_cores = int(lines[0][0])  # first line is the number of Cores
-    nb_processes = int(lines[1][0])  # first line is the number of Cores
-    processes = []
-    i=2
-    name=0
-    while i < nb_processes:
-        
-        start_time, duration = int (lines[i][0]), int (lines[i][1])
-        name+=1
-        processes.append(name, start_time, duration)
-    
-    return nb_cores, nb_processes, processes
+    return processes
 
 def read_commands_file(filename="commands.txt"):
     with open(filename, 'r') as file:
@@ -100,30 +68,24 @@ def store(variable, value):
     time.sleep(1)
     return 
 
-def fair_share_scheduler(quantum, processes, file):
-    global time_counter
+def fifo_scheduler(processes, file):
+    global running_processes
+    waiting_queue = processes[:]
 
-    while processes:
-        active_users = list(set(p[0] for p in processes if p[1] <= time_counter)) #all users with active processes
-        num_active_users = len(active_users)
+    while waiting_queue:
+        for proc in waiting_queue[:]:
+            if proc["start"] <= time_counter and len(running_processes) < max_cores:
+                thread = threading.Thread(target=run_process, args=(proc, file))
+                running_processes.append(proc["id"])
+                thread.start()
+                proc["thread"] = thread
+                waiting_queue.remove(proc)
 
-        if num_active_users == 0: #stop if no users
-            break
+        time.sleep(0.1)  # Avoid tight loop
 
-        user_share = quantum // num_active_users
-        executed_any = False #manages process has-executed logic
-
-        userThreads = []
-        for user in active_users:
-            #each user will have their own thread for scheduling
-            user_thread = threading.Thread(target=process_select, args=(user, processes, user_share, time_counter, file))
-            userThreads.append(user_thread)
-            user_thread.start()
-
-        for user_thread in userThreads:
-            user_thread.join()  #ensure all user threads are finished before continuing
-
-        processes = [p for p in processes if p[2] > 0] #if a process has finished, take it out of the list
+    # Wait for all running threads to finish
+    for proc in processes:
+        proc["thread"].join()
 
 
 
@@ -154,74 +116,57 @@ def process_select(user, processes, user_share, time_counter, file):
 
 process_started = {}  #tracks started processes
 
-def run_process(user, process_id, execution_time, process, file):
-    global time_counter, process_started
-    if execution_time > 0:
-        with process_lock:
-            if (user, process_id) not in process_started:
-                file.write(f"Time {time_counter}, User {user}, Process {process_id}, Started\n")
-                process_started[(user, process_id)] = True  # Mark process as started
-            else:
-                file.write(f"Time {time_counter}, User {user}, Process {process_id}, Resumed\n")
+def run_process(proc, file):
+    global running_processes, time_counter
+    with process_lock:
+        file.write(f"Clock: {time_counter}, Process {proc['id']}: Started.\n")
+        print(f"Clock: {time_counter}, Process {proc['id']}: Started.")
 
-             # Wait for each second of execution
-        for _ in range(execution_time):
-            # Wait until time_counter increases (simulate real-time execution)
-            current_time = time_counter
-            while time_counter == current_time:
-                time.sleep(0.01)  # Light sleep to avoid CPU hogging
+    for _ in range(proc["duration"]):
+        current_time = time_counter
+        while time_counter == current_time:
+            time.sleep(0.01)
 
-            # Decrease burst time one second at a time
-            with process_lock:
-                process[2] -= 1
-                if process[2] <= 0:
-                    process[2] = 0
-                    file.write(f"Time {time_counter}, User {user}, Process {process_id}, Finished\n")
-                    return  # Done
-                
-        # If not finished, log pause
-        with process_lock:
-            file.write(f"Time {time_counter}, User {user}, Process {process_id}, Paused\n")
+    with process_lock:
+        file.write(f"Clock: {time_counter}, Process {proc['id']}: Finished.\n")
+        print(f"Clock: {time_counter}, Process {proc['id']}: Finished.")
+        running_processes.remove(proc["id"])
 
-    def release(variableId):
-        virtual_memory = read_main_memory()
-        disk_memory = read_disk_memory()
-        
-        for index, (id, ) in enumerate(virtual_memory):
-            if id == variableId:
-                removed_tuple = virtual_memory.pop(index)  # Remove the matching tuple
-                return index, removed_tuple
-            else:
-                for index, (id, ) in enumerate(disk_memory):
-                    if id == variableId:
-                        removed_tuple = disk_memory.pop(index)  # Remove the matching tuple
-                        return index, removed_tuple
-        return None
+def release(variableId):
+    virtual_memory = read_main_memory()
+    disk_memory = read_disk_memory()
+    
+    for index, (id, ) in enumerate(virtual_memory):
+        if id == variableId:
+            removed_tuple = virtual_memory.pop(index)  # Remove the matching tuple
+            return index, removed_tuple
+        else:
+            for index, (id, ) in enumerate(disk_memory):
+                if id == variableId:
+                    removed_tuple = disk_memory.pop(index)  # Remove the matching tuple
+                    return index, removed_tuple
+    return None
 
-      
-      def read_disk_memory():
-        with open("vm.txt", 'r') as file:
-            disk_memory_string = file.read().strip()
-            return eval(disk_memory_string)
+def read_disk_memory():
+    with open("vm.txt", 'r') as file:
+        disk_memory_string = file.read().strip()
+        return eval(disk_memory_string)
 
-    def read_main_memory():
-        global virtual_memory
-        return virtual_memory
-
-
+def read_main_memory():
+    global virtual_memory
+    return virtual_memory
 
 
 if __name__ == "__main__":
     virtual_memory = []
     commands = read_commands_file()
-    nb_cores, nb_processes, processes = read_process_file()
+    processes = read_processes_file("processes.txt")
     memory_space = read_memconfig_file()
-    quantum, processes = read_input_file()
 
     with open("output.txt", 'w') as file:
 
-        scheduler_thread = threading.Thread(target=fair_share_scheduler, args=(quantum,processes,file))
         timer_thread = threading.Thread(target=timer)
+        scheduler_thread = threading.Thread(target=fifo_scheduler, args=(processes, file))
 
         timer_thread.start()
         scheduler_thread.start()
