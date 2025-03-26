@@ -1,9 +1,9 @@
 Clock: 1, Process 1: Started.
-Clock: 2, Process 1, Store: Variable 1, Value: 5
 Clock: 2, Process 0: Started.
-Clock: 3, Process 1, Store: Variable 2, Value: 3
+Clock: 2, Process 1, Store: Variable 1, Value: 5
+Clock: 3, Process 0, Store: Variable 2, Value: 3
+Clock: 3, Process 1, Store: Variable 3, Value: 7
 Clock: 3, Process 1: Finished.
-Clock: 3, Process 0, Store: Variable 3, Value: 7
 Clock: 4, Process 0, Lookup: Variable 3, Result: 7
 Clock: 4, Process 2: Started.
 Clock: 5, Process 0, Lookup: Variable 2, Result: 3
