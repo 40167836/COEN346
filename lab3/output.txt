@@ -1,14 +1,14 @@
-Clock: 1, Process 1: Started.
-Clock: 2, Process 0: Started.
-Clock: 2, Process 1, Store: Variable 1, Value: 5
-Clock: 3, Process 0, Store: Variable 2, Value: 3
-Clock: 3, Process 1, Store: Variable 3, Value: 7
-Clock: 3, Process 1: Finished.
-Clock: 4, Process 0, Lookup: Variable 3, Result: 7
-Clock: 4, Process 2: Started.
-Clock: 5, Process 0, Lookup: Variable 2, Result: 3
-Clock: 5, Process 0: Finished.
-Clock: 5, Process 2, Release: Variable 1
-Clock: 6, Process 2, Store: Variable 1, Value: 8
-Clock: 7, Process 2, Lookup: Variable 1, Result: 8
-Clock: 7, Process 2: Finished.
+Clock: 1.606, Process 1: Started.
+Clock: 2.4090000000000003, Process 1, Store: Variable 1, Value: 5
+Clock: 2.4090000000000003, Process 0: Started.
+Clock: 3.212, Process 0, Store: Variable 2, Value: 3
+Clock: 3.212, Process 1, Store: Variable 3, Value: 7
+Clock: 4.015000000000001, Process 0, Lookup: Variable 3, Result: 7
+Clock: 4.015000000000001, Process 1, Lookup: Variable 2, Result: 3
+Clock: 4.015000000000001, Process 1: Finished.
+Clock: 4.015000000000001, Process 2: Started.
+Clock: 4.8180000000000005, Process 2, Release: Variable 1
+Clock: 4.8180000000000005, Process 0, Store: Variable 1, Value: 8
+Clock: 5.621, Process 2, Lookup: Variable 1, Result: 8
+Clock: 5.621, Process 0: Finished.
+Clock: 7.227, Process 2: Finished.

@@ -1,15 +1,17 @@
 import threading
 import time
 import ast
+import random 
 
 process_lock = threading.Lock()
 
-time_counter = 1  # Shared Variable Start global time at 1s
+time_counter = 0  # Shared Variable Start global time at 1s
 time_running = True
 memory_used = 0
 main_memory = []
 command_index = 0
 running_processes = []
+random_sleep = (random.randint(1, 1000))/1000
 
 vm_file = None
 output_file = None
@@ -19,8 +21,8 @@ output_file = None
 def timer(): # Each time this runs in the timer thread, the time counter is incremented by 1. This keeps an accurate parallel time running
     global time_counter 
     while time_running:
-        time.sleep(1)
-        time_counter += 1
+        time.sleep(random_sleep)
+        time_counter += random_sleep
         print(f"Time: {time_counter}s")
 
 # We execute the following three methods once at the beginning of the run to configure the CPU
@@ -186,31 +188,33 @@ def run_process(proc, file): # This is gonna be assigned to a thread. It will ex
             time.sleep(0.01)
 
         with process_lock:
-            # Pick next command
-            command = commands[command_index % len(commands)]
-            command_index += 1
 
-            if command[0].lower() == "store":
-                _, var_id, value = command
-                store(var_id, value)
-                file.write(f"Clock: {time_counter}, Process {proc['id']}, Store: Variable {var_id}, Value: {value}\n")
+            if command_index < len(commands):
+                # Pick next command
+                command = commands[command_index % len(commands)]
+                command_index += 1
 
-            elif command[0].lower() == "release":
-                _, var_id = command
-                release(var_id)
-                file.write(f"Clock: {time_counter}, Process {proc['id']}, Release: Variable {var_id}\n")
+                if command[0].lower() == "store":
+                    _, var_id, value = command
+                    store(var_id, value)
+                    file.write(f"Clock: {time_counter}, Process {proc['id']}, Store: Variable {var_id}, Value: {value}\n")
 
-            elif command[0].lower() == "lookup":
-                _, var_id = command
-                val = lookup(var_id)
-                file.write(f"Clock: {time_counter}, Process {proc['id']}, Lookup: Variable {var_id}, Result: {val}\n")
+                elif command[0].lower() == "release":
+                    _, var_id = command
+                    release(var_id)
+                    file.write(f"Clock: {time_counter}, Process {proc['id']}, Release: Variable {var_id}\n")
 
-            else:
-                print(f"Unknown command: {command}")
-            
-        
-        proc["duration"] -= 1  # Simulate one second of work
-        
+                elif command[0].lower() == "lookup":
+                    _, var_id = command
+                    val = lookup(var_id)
+                    file.write(f"Clock: {time_counter}, Process {proc['id']}, Lookup: Variable {var_id}, Result: {val}\n")
+
+                else:
+                    print(f"Unknown command: {command}")
+
+            proc["duration"] -= random_sleep  # Decrease duration correctly
+            proc["duration"] = max(0, proc["duration"])  # Ensure it never goes negative
+            print(f"Clock: {time_counter}, Process {proc['id']} duration remaining: {proc['duration']}")
 
     with process_lock:
         file.write(f"Clock: {time_counter}, Process {proc['id']}: Finished.\n")
@@ -263,6 +267,7 @@ if __name__ == "__main__":
     commands = read_commands_file()
     processes = read_processes_file()
     memory_space = read_memconfig_file()
+    with open("vm.txt", "w") as file: None #clear file for new runs. 
 
     with open("output.txt", 'w') as file:
 
@@ -274,4 +279,4 @@ if __name__ == "__main__":
         scheduler_thread.join() 
         time_running = False # Make timer stop
         timer_thread.join()
-     
+      
