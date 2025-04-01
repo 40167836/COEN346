@@ -1,9 +1,12 @@
 import threading
 import time
 import ast
-import random 
+import random
+import queue
 
 process_lock = threading.Lock()
+
+memory_queue = queue.Queue()
 
 time_counter = 0  # Shared Variable Start global time at 1s
 time_running = True
@@ -11,20 +14,16 @@ memory_used = 0
 main_memory = []
 command_index = 0
 running_processes = []
-random_sleep = (random.randint(1, 1000))/1000
+
 
 vm_file = None
 output_file = None
 
-
-
-def timer(): # Each time this runs in the timer thread, the time counter is incremented by a random time . This keeps an accurate parallel time running
-    global time_counter 
-    while time_running:
-        time.sleep(random_sleep)
-        time_counter += random_sleep
-        print(f"Time: {time_counter}s")
-
+lookup_results = {}
+sleep = 0
+def random_sleep():
+ 
+    return (random.randint(1, 1000))/1000
 # We execute the following three methods once at the beginning of the run to configure the CPU
 
 def read_processes_file(filename="processes.txt"): # We open the processes.txt file once, extract the information, and return it as a list
@@ -38,124 +37,171 @@ def read_processes_file(filename="processes.txt"): # We open the processes.txt f
     processes = []
     for i in range(2, 2 + num_processes): # We start at 2 since 0 is the number of cores, and 1 is the number of processes
         start_time, duration = map(int, lines[i])
-        processes.append({"id": i - 1, "start": start_time, "duration": duration}) # Readable format for other methods
+        processes.append({"id": i - 2, "start": start_time, "duration": duration}) # Readable format for other methods
 
-    return processes # It's a list of tuples of start time and duration
+    return processes
 
-def read_commands_file(filename="commands.txt"):  # Same as processes.txt, we open once and make a list. This is easier to use than fileIO
+def read_commands_file(filename="commands.txt"): # Same as processes.txt, we open once and make a list. This is easier to use than fileIO
     with open(filename, 'r') as file:
-        # Reads line by line. Strip() removes any whitespace at the beginning and end, and split() makes a substring out of the string.
+         # Reads line by line. Strip() removes any whitespace at the beginning and end, and split() makes a substring out of the string.
         lines = [line.strip().split() for line in file.readlines()]
         commands = []
 
     for line in lines:
-        command_line = [int(value) if value.isdigit() else value for value in line] # Only if each char is a digit.
+        command_line = [int(value) if value.isdigit() else value for value in line]# Only if each char is a digit.
         commands.append(command_line)
 
     return commands # These contain the actual commands, the variable ID, and the variable
 
-def read_memconfig_file(filename="memconfig.txt"): # Extract number of pages from memconfig.txt, this one is pretty simple
+def read_memconfig_file(filename="memconfig.txt"):# Extract number of pages from memconfig.txt, this one is pretty simple
     with open(filename, 'r') as file:
-       memory_space = file.read().strip()
+        memory_space = file.read().strip()
 
     return int(memory_space)
 
+def timer(): # Each time this runs in the timer thread, the time counter is incremented by a random time. This keeps an accurate parallel time running
+    global time_counter
+    while time_running:
+        global sleep
+        sleep = random_sleep()
+        time.sleep(sleep)
+        time_counter += sleep
+        print(f"Time: {time_counter}s")
 
-def store(variable, value): # Store a variable in memory, in pages of main memory or in disk memory if full.
+#the next 3 functions put memory commands in a queue that can be accessed by the memeory manager that is running in its own thread.
+def store(variable, value): 
+    memory_queue.put(("store", (variable, value)))
+
+def release(variableId):
+    memory_queue.put(("release", (variableId,)))
+
+def lookup (variableId, current_time):
+    memory_queue.put(("lookup", (variableId, current_time)))
+
+def lookup_memory(variableId, current_time):
+    global main_memory, time_counter, memory_used, memory_space
+    swap = False 
+    # Search in main memory
+    for i, (var, val, last_access) in enumerate(main_memory):
+        if var == variableId:
+            # Update last access time
+            main_memory[i] = (var, val, time_counter)
+            print(f"[LOOKUP] Found {variableId} in main memory. Value: {val}")
+            return val, swap 
+
+    # If not found in main memory, we need to page fault
+    print(f"[LOOKUP] Page fault: {variableId} not found in main memory.")
+    
+    # Fetch from disk memory
+    disk_memory = get_vm_contents()
+    for i, (var, val, last_access) in enumerate(disk_memory):
+        if var == variableId:
+            # Move to main memory (if there's space)
+            print(f"[LOOKUP] Page fault: {variableId} found in disk memory.")
+            entry = disk_memory[i]
+            remove_from_vm_file(entry)
+
+            if memory_used < memory_space:
+                # Space available in main memory
+                main_memory.append((var, val, time_counter))
+                memory_used += 1
+                print(f"[LOOKUP] Moved {entry} to main memory.")
+            else:
+                # Evict LRU entry if memory is full
+                main_memory.sort(key=lambda x: x[2])  # Sort by last access time (LRU eviction)
+                evicted = main_memory.pop(0)
+                swap = True
+                file.write(f"Clock: {current_time + 0.005}, Memory Manager, Swap : Variable {entry[0]} with Variable {evicted[0]}\n")
+                print(f"[LOOKUP] Swapping out {evicted} for {entry}")
+
+
+                # Write evicted to disk
+                append_vm_file(evicted)
+
+                # Add the new entry to main memory
+                main_memory.append((var, val, time_counter))
+
+            return val, swap
+
+    print(f"[LOOKUP] Variable {variableId} not found in memory or disk.")
+    return -1
+
+def memory_manager():
+    while time_running:
+        try:
+            operation, args = memory_queue.get(timeout=1)
+            if operation == "store":
+                store_memory(*args)
+            elif operation == "release":
+                release_memory(*args)
+            elif operation == "lookup":
+                lookup_memory(*args)  # Store the result for later
+        except queue.Empty:
+            pass
+
+def store_memory(variable, value):# Store a variable in memory, in pages of main memory or in disk memory if full.
     global memory_used, main_memory, memory_space, time_counter
 
-    entry = (variable, value, time_counter)  # Third entry is last access time, for lookup
+    entry = (variable, value, time_counter) # Third entry is last access time, for lookup
 
     if memory_used < memory_space: # We want ideally to keep it local
         main_memory.append(entry)
         memory_used += 1
         print(f"[STORE] Stored {entry} in main memory.")
-    else:
 
+    else:
         append_vm_file(entry)
         print(f"[STORE] Stored {entry} in disk (memory full). Saved to vm.txt.")
 
-
-    return
-
-
-def release(variableId): # Remove from memory
+def release_memory(variableId): # Remove from memory
     global main_memory, memory_used
-
     disk_memory = get_vm_contents()
     for i, (var, val, access_time) in enumerate(main_memory):  # Try removing from main memory
         if var == variableId:
-            removed = main_memory.pop(i)
+            main_memory.pop(i)
             memory_used -= 1  # Free up space in main memory
-            print(f"[RELEASE] Removed {removed} from main memory.")
+            return True 
+        
+    for i, (var, val, access_time) in enumerate(disk_memory): # Try removing from disk memory
+        if var == variableId:
+            remove_from_vm_file(disk_memory[i])
             return True
+        
+    return True 
 
+def append_vm_file(new_entry):
+    with open("vm.txt", "r+") as vm_file:
+        vm_file.seek(0)
+        contents = vm_file.read().strip()
+        disk_memory = ast.literal_eval(contents) if contents else []
+        disk_memory.append(new_entry)
+        vm_file.seek(0)
+        vm_file.write(str(disk_memory))
+        vm_file.truncate()
 
-    for i, (var, val, access_time) in enumerate(disk_memory):  # Try removing from disk memory
-        if var == variableId:
-            removed = disk_memory[i]
+def remove_from_vm_file(entry):
+    with open("vm.txt", "r+") as vm_file:
+        vm_file.seek(0)
+        contents = vm_file.read().strip()
+        disk_memory = ast.literal_eval(contents) if contents else []
+        try:
+            disk_memory.remove(entry)
+        except ValueError:
+            print(f"[ERROR] {entry} not found in vm.txt.")
+            return
+        vm_file.seek(0)
+        vm_file.write(str(disk_memory))
+        vm_file.truncate()
 
-            remove_from_vm_file(removed)
-            print(f"[RELEASE] Removed {removed} from disk memory.")
-            return True
-
-    print(f"[RELEASE] Variable {variableId} not found in memory.")
-    return False
-
-
-def lookup(variableId): # Find a variable in memory. If page fault occurs, take it out of the disk and move into main memory. if there's no space, move the least recently used memory into the disk memory
-    global main_memory, time_counter, memory_used, memory_space
-
-    # Search in main memory
-    for i, (var, val, last_access) in enumerate(main_memory):
-        if var == variableId:
-            main_memory[i] = (var, val, time_counter)  # Update last access
-            print(f"[LOOKUP] Found {variableId} in main memory. Value: {val}")
-            return val
-
-    # Search in disk memory (page fault)
-    disk_memory = get_vm_contents()
-    for i, (var, val, last_access) in enumerate(disk_memory):
-        if var == variableId:
-            print(f"[LOOKUP] Page fault: {variableId} found in disk.")
-
-            # Remove from disk
-            entry = disk_memory[i]
-
-            remove_from_vm_file(entry)
-
-            # If space in main memory, move in
-            if memory_used < memory_space:
-                main_memory.append((var, val, time_counter))
-                memory_used += 1
-                print(f"[LOOKUP] Moved {entry} to main memory.")
-            else:
-                # LRU Replacement (Least Recently Used)
-                main_memory.sort(key=lambda x: x[2])  # Sort by last access time
-                evicted = main_memory.pop(0)
-                memory_used -= 1
-                print(f"[LOOKUP] Swapping out {evicted} for {entry}")
-                
-                file.write(f"Clock: {time_counter}, Memory Manager, SWAP: Variable {evicted[0]} with Variable {variableId}\n")
-                # Add evicted to disk
-                append_vm_file(evicted)
-
-                # Add new entry to main memory
-                main_memory.append((var, val, time_counter))
-
-            return val
-
-    # Not found anywhere
-    print(f"[LOOKUP] Variable {variableId} not found.")
-    return -1
-
-
-
+def get_vm_contents():
+    with open("vm.txt", "r") as vm_file:
+        vm_file.seek(0)
+        contents = vm_file.read().strip()
+    return ast.literal_eval(contents) if contents else []
 
 def fifo_scheduler(processes, file): # This scheduler is an adaptation of Assignment 2. It takes the list of processes and iterates across it, assigning the next one up to a thread on any free core. 
     global running_processes # Tracks processes that have been assigned to a thread
     waiting_queue = processes[:] # Remember we get processes from read_processes_file 
-
     while waiting_queue:
         for proc in waiting_queue[:]:
             if proc["start"] <= time_counter and len(running_processes) < max_cores: # max_cores works here to limit the number of threads 
@@ -164,120 +210,74 @@ def fifo_scheduler(processes, file): # This scheduler is an adaptation of Assign
                 thread.start()
                 proc["thread"] = thread
                 waiting_queue.remove(proc)
+        time.sleep(0.1) # This worked to keep the loop from going too fast in past assignments
 
-        time.sleep(0.1)  # This worked to keep the loop from going too fast in past assignments
-
-    # Wait for all running threads to finish
     for proc in processes:
         proc["thread"].join()
 
-
-
-
 def run_process(proc, file): # This is gonna be assigned to a thread. It will execute any of the three processes, store(), release(), or lookup()
-    global running_processes, time_counter, command_index
-
-    current_time = time_counter
+    global running_processes, time_counter, command_index, sleep
+    
     with process_lock:
-        file.write(f"Clock: {time_counter}, Process {proc['id']}: Started.\n")
-        print(f"Clock: {time_counter}, Process {proc['id']}: Started.")
-
-    # Simulate command execution
-    while proc["duration"] > 0:
+        file.write(f"Clock: {proc['start']}, Process {proc['id']}: Started.\n")
+        print(f"Clock: {proc['start']}, Process {proc['id']}: Started.")
+        duration = proc["duration"]
+    while True: 
+        
         current_time = time_counter
+        if current_time >= proc["duration"] + proc["start"]:
+            break
+
         while time_counter == current_time:
             time.sleep(0.01)
-
         with process_lock:
-
             if command_index < len(commands):
-                # Pick next command
                 command = commands[command_index % len(commands)]
                 command_index += 1
-
                 if command[0].lower() == "store":
                     _, var_id, value = command
                     store(var_id, value)
-                    file.write(f"Clock: {time_counter}, Process {proc['id']}, Store: Variable {var_id}, Value: {value}\n")
-
+                    file.write(f"Clock: {current_time}, Process {proc['id']}, Store: Variable {var_id}, Value: {value}\n")
                 elif command[0].lower() == "release":
                     _, var_id = command
                     release(var_id)
-                    file.write(f"Clock: {time_counter}, Process {proc['id']}, Release: Variable {var_id}\n")
-
+                    file.write(f"Clock: {current_time}, Process {proc['id']}, Release: Variable {var_id}\n")
                 elif command[0].lower() == "lookup":
                     _, var_id = command
-                    val = lookup(var_id)
-                    file.write(f"Clock: {time_counter}, Process {proc['id']}, Lookup: Variable {var_id}, Result: {val}\n")
-
+                    val, swap = lookup_memory(var_id, current_time)
+                    if swap == False:
+                        file.write(f"Clock: {current_time}, Process {proc['id']}, Lookup: Variable {var_id}, Result: {val}\n")
+                    elif swap == True:  
+                        file.write(f"Clock: {current_time + 0.010}, Process {proc['id']}, Lookup: Variable {var_id}, Result: {val}\n")
+                    
                 else:
                     print(f"Unknown command: {command}")
 
-            proc["duration"] -= random_sleep  # Decrease duration correctly
-            proc["duration"] = max(0, proc["duration"])  # Ensure it never goes negative
             print(f"Clock: {time_counter}, Process {proc['id']} duration remaining: {proc['duration']}")
+            current_time = time_counter
 
+    time.sleep(0.01)
     with process_lock:
-        file.write(f"Clock: {time_counter}, Process {proc['id']}: Finished.\n")
-        print(f"Clock: {time_counter}, Process {proc['id']}: Finished.")
+        finish = proc["start"] + duration
+        file.write(f"Clock: {finish}, Process {proc['id']}: Finished.\n")
+        print(f"Clock: {finish}, Process {proc['id']}: Finished.")
         running_processes.remove(proc["id"])
 
-def append_vm_file(new_entry):
-    # Append a new entry to vm.txt.
-    with open("vm.txt", "r+") as vm_file: # r+ is read and write
-        vm_file.seek(0)
-        contents = vm_file.read().strip()
-        disk_memory = ast.literal_eval(contents) if contents else []
-
-        disk_memory.append(new_entry)
-
-        # Overwrite file with updated list
-        vm_file.seek(0)
-        vm_file.write(str(disk_memory))
-        vm_file.truncate()
-
-def remove_from_vm_file(entry):
-    # Remove an entry from vm.txt.
-    with open("vm.txt", "r+") as vm_file:
-        vm_file.seek(0)
-        contents = vm_file.read().strip()
-        disk_memory = ast.literal_eval(contents) if contents else []
-
-        try:
-            disk_memory.remove(entry)
-        except ValueError:
-            print(f"[ERROR] {entry} not found in vm.txt.")
-            return
-
-        # Overwrite file with updated list
-        vm_file.seek(0)
-        vm_file.write(str(disk_memory))
-        vm_file.truncate()
-
-def get_vm_contents():
-    # Read and return the list of entries in vm.txt.
-    with open("vm.txt", "r") as vm_file:
-        vm_file.seek(0)
-        contents = vm_file.read().strip()
-
-    return ast.literal_eval(contents) if contents else []
-
-
 if __name__ == "__main__":
-    virtual_memory = []
     commands = read_commands_file()
     processes = read_processes_file()
     memory_space = read_memconfig_file()
-    with open("vm.txt", "w") as file: None #clear file for new runs. 
+    with open("vm.txt", "w") as file:#clear file for new runs. 
+        None
 
-    with open("output.txt", 'w') as file:
-
+    with open("output.txt", "w") as file:
         timer_thread = threading.Thread(target=timer)
         scheduler_thread = threading.Thread(target=fifo_scheduler, args=(processes, file))
-
+        memory_thread = threading.Thread(target=memory_manager)
         timer_thread.start()
+        memory_thread.start()
         scheduler_thread.start()
-        scheduler_thread.join() 
-        time_running = False # Make timer stop
+        scheduler_thread.join()
+        time_running = False #Make timer stop
         timer_thread.join()
-      
+        memory_thread.join()

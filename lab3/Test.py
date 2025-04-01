@@ -199,22 +199,23 @@ def get_vm_contents():
         contents = vm_file.read().strip()
     return ast.literal_eval(contents) if contents else []
 
-def fifo_scheduler(processes, file):
-    global running_processes
-    waiting_queue = processes[:]
+def fifo_scheduler(processes, file): # This scheduler is an adaptation of Assignment 2. It takes the list of processes and iterates across it, assigning the next one up to a thread on any free core. 
+    global running_processes # Tracks processes that have been assigned to a thread
+    waiting_queue = processes[:] # Remember we get processes from read_processes_file 
     while waiting_queue:
         for proc in waiting_queue[:]:
-            if proc["start"] <= time_counter and len(running_processes) < max_cores:
-                thread = threading.Thread(target=run_process, args=(proc, file))
+            if proc["start"] <= time_counter and len(running_processes) < max_cores: # max_cores works here to limit the number of threads 
+                thread = threading.Thread(target=run_process, args=(proc, file)) # Assign a process to a thread 
                 running_processes.append(proc["id"])
                 thread.start()
                 proc["thread"] = thread
                 waiting_queue.remove(proc)
-        time.sleep(0.1)
+        time.sleep(0.1) # This worked to keep the loop from going too fast in past assignments
+
     for proc in processes:
         proc["thread"].join()
 
-def run_process(proc, file):
+def run_process(proc, file): # This is gonna be assigned to a thread. It will execute any of the three processes, store(), release(), or lookup()
     global running_processes, time_counter, command_index, sleep
     
     with process_lock:
@@ -254,6 +255,8 @@ def run_process(proc, file):
 
             print(f"Clock: {time_counter}, Process {proc['id']} duration remaining: {proc['duration']}")
             current_time = time_counter
+
+
     with process_lock:
         finish = proc["start"] + duration
         file.write(f"Clock: {finish}, Process {proc['id']}: Finished.\n")
@@ -264,8 +267,9 @@ if __name__ == "__main__":
     commands = read_commands_file()
     processes = read_processes_file()
     memory_space = read_memconfig_file()
-    with open("vm.txt", "w") as file:
-        pass
+    with open("vm.txt", "w") as file:#clear file for new runs. 
+        None
+
     with open("output.txt", "w") as file:
         timer_thread = threading.Thread(target=timer)
         scheduler_thread = threading.Thread(target=fifo_scheduler, args=(processes, file))
@@ -274,6 +278,6 @@ if __name__ == "__main__":
         memory_thread.start()
         scheduler_thread.start()
         scheduler_thread.join()
-        time_running = False
+        time_running = False #Make timer stop
         timer_thread.join()
         memory_thread.join()
