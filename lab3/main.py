@@ -18,7 +18,7 @@ output_file = None
 
 
 
-def timer(): # Each time this runs in the timer thread, the time counter is incremented by 1. This keeps an accurate parallel time running
+def timer(): # Each time this runs in the timer thread, the time counter is incremented by a random time . This keeps an accurate parallel time running
     global time_counter 
     while time_running:
         time.sleep(random_sleep)
@@ -71,7 +71,6 @@ def store(variable, value): # Store a variable in memory, in pages of main memor
         memory_used += 1
         print(f"[STORE] Stored {entry} in main memory.")
     else:
-        append_vm_file(entry)
 
         append_vm_file(entry)
         print(f"[STORE] Stored {entry} in disk (memory full). Saved to vm.txt.")
@@ -177,6 +176,7 @@ def fifo_scheduler(processes, file): # This scheduler is an adaptation of Assign
 def run_process(proc, file): # This is gonna be assigned to a thread. It will execute any of the three processes, store(), release(), or lookup()
     global running_processes, time_counter, command_index
 
+    current_time = time_counter
     with process_lock:
         file.write(f"Clock: {time_counter}, Process {proc['id']}: Started.\n")
         print(f"Clock: {time_counter}, Process {proc['id']}: Started.")
