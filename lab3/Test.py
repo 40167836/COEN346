@@ -75,8 +75,8 @@ def store(variable, value):
 def release(variableId):
     memory_queue.put(("release", (variableId,)))
 
-def lookup (variableId):
-    memory_queue.put(("lookup", (variableId,)))
+def lookup (variableId, current_time):
+    memory_queue.put(("lookup", (variableId, current_time)))
 
 def lookup_memory(variableId, current_time):
     global main_memory, time_counter, memory_used, memory_space
@@ -136,9 +136,7 @@ def memory_manager():
             elif operation == "release":
                 release_memory(*args)
             elif operation == "lookup":
-                variableId = args
-                result = lookup_memory(variableId)
-                lookup_results[variableId] = result  # Store the result for later
+                lookup_memory(*args)  # Store the result for later
         except queue.Empty:
             pass
 
