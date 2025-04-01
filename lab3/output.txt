@@ -1,15 +1,15 @@
-Clock: 1, Process 1: Started.
-Clock: 1.35, Process 1, Store: Variable 1, Value: 5
-Clock: 1.6640000000000001, Process 1, Store: Variable 2, Value: 3
-Clock: 2, Process 0: Started.
-Clock: 2.633, Process 0, Store: Variable 3, Value: 7
-Clock: 2.638, Memory Manager, Swap : Variable 3 with Variable 1
-Clock: 2.643, Process 1, Lookup: Variable 3, Result: 7
-Clock: 3, Process 1: Finished.
-Clock: 3.5460000000000003, Process 0, Lookup: Variable 2, Result: 3
-Clock: 3.7300000000000004, Process 0, Release: Variable 1
-Clock: 3.9160000000000004, Process 0, Store: Variable 1, Value: 8
-Clock: 4, Process 2: Started.
-Clock: 4.916, Process 0, Lookup: Variable 1, Result: 8
-Clock: 5, Process 0: Finished.
-Clock: 7, Process 2: Finished.
+Clock: 1.224, Process 2: Started.
+Clock: 1.53, Process 2, Store: Variable 1, Value: 5
+Clock: 1.836, Process 2, Store: Variable 2, Value: 3
+Clock: 2.142, Process 2, Store: Variable 3, Value: 7
+Clock: 2.142, Process 1: Started.
+Clock: 2.448, Memory Manager, SWAP: Variable 1 with Variable 3
+Clock: 2.448, Process 1, Lookup: Variable 3, Result: 7
+Clock: 2.448, Process 2, Lookup: Variable 2, Result: 3
+Clock: 2.754, Process 2, Release: Variable 1
+Clock: 2.754, Process 1, Store: Variable 1, Value: 8
+Clock: 3.06, Process 1, Lookup: Variable 1, Result: 8
+Clock: 3.366, Process 2: Finished.
+Clock: 4.284, Process 3: Started.
+Clock: 5.202, Process 1: Finished.
+Clock: 7.344, Process 3: Finished.

@@ -38,7 +38,7 @@ def read_processes_file(filename="processes.txt"): # We open the processes.txt f
     processes = []
     for i in range(2, 2 + num_processes): # We start at 2 since 0 is the number of cores, and 1 is the number of processes
         start_time, duration = map(int, lines[i])
-        processes.append({"id": i - 2, "start": start_time, "duration": duration}) # Readable format for other methods
+        processes.append({"id": i - 1, "start": start_time, "duration": duration}) # Readable format for other methods
 
     return processes # It's a list of tuples of start time and duration
 
@@ -135,7 +135,8 @@ def lookup(variableId): # Find a variable in memory. If page fault occurs, take 
                 evicted = main_memory.pop(0)
                 memory_used -= 1
                 print(f"[LOOKUP] Swapping out {evicted} for {entry}")
-
+                
+                file.write(f"Clock: {time_counter}, Memory Manager, SWAP: Variable {evicted[0]} with Variable {variableId}\n")
                 # Add evicted to disk
                 append_vm_file(evicted)
 
