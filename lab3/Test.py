@@ -110,7 +110,6 @@ def lookup_memory(variableId, current_time):
                 # Evict LRU entry if memory is full
                 main_memory.sort(key=lambda x: x[2])  # Sort by last access time (LRU eviction)
                 evicted = main_memory.pop(0)
-                memory_used -= 1
                 swap = True
                 file.write(f"Clock: {current_time + 0.005}, Memory Manager, Swap : Variable {entry[0]} with Variable {evicted[0]}\n")
                 print(f"[LOOKUP] Swapping out {evicted} for {entry}")
